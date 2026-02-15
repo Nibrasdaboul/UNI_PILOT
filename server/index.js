@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import bcrypt from 'bcryptjs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { initDb } from './db.js';
@@ -22,6 +23,23 @@ import {
 } from './lib/gradeUtils.js';
 
 initDb();
+
+// Ensure default admin and student exist (e.g. first deploy on Render, or missing admin)
+(function seedDefaultUsers() {
+  const insert = db.prepare(`
+    INSERT INTO users (email, password_hash, full_name, role) VALUES (?, ?, ?, ?)
+  `);
+  const hasAdmin = db.prepare("SELECT 1 FROM users WHERE email = 'admin@unipilot.local'").get();
+  const hasStudent = db.prepare("SELECT 1 FROM users WHERE email = 'student@unipilot.local'").get();
+  if (!hasAdmin) {
+    insert.run('admin@unipilot.local', bcrypt.hashSync('Admin123!', 10), 'Admin', 'admin');
+    console.log('Created default admin: admin@unipilot.local / Admin123!');
+  }
+  if (!hasStudent) {
+    insert.run('student@unipilot.local', bcrypt.hashSync('Student123!', 10), 'Student', 'student');
+    console.log('Created default student: student@unipilot.local / Student123!');
+  }
+})();
 
 // Recalculate final mark for a student_course from grade_items and update student_courses.current_grade
 function recalcCourseGrade(studentCourseId) {
